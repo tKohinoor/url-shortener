@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>URL Shortener</title>
+  <style>
+    :root {
+      --bg: #070d1c;
+      --surface: #0c1427;
+      --border: #1f2c46;
+      --border-focus: #2f8bff;
+      --text: #f4f7ff;
+      --muted: #7c89a6;
+      --blue: #0a84ff;
+      --blue-hover: #2b95ff;
+      --link: #5cc0ff;
+      --ok: #34d399;
+      --err: #f87171;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .wrap {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 7rem 1.25rem 4rem;
+      text-align: center;
+    }
+
+    .logo { color: var(--blue); margin-bottom: 1rem; }
+    .logo svg { display: block; margin: 0 auto; }
+
+    h1 {
+      margin: 0 0 0.6rem;
+      font-size: clamp(2.4rem, 7vw, 3.6rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+    }
+    h1 span {
+      background: linear-gradient(90deg, #0a84ff, #2f9bff);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .sub { margin: 0 0 2.5rem; color: var(--muted); font-size: 1.15rem; }
+
+    /* ---------- form ---------- */
+    .form-row {
+      display: flex;
+      gap: 0.9rem;
+      max-width: 860px;
+      margin: 0 auto;
+    }
+
+    .input-wrap {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      padding: 0 1.1rem;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      color: var(--muted);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .input-wrap:focus-within {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(10, 132, 255, 0.18);
+    }
+    .input-wrap svg { flex-shrink: 0; }
+
+    input {
+      width: 100%;
+      min-width: 0;
+      padding: 1.1rem 0;
+      font: inherit;
+      font-size: 1.05rem;
+      color: var(--text);
+      background: transparent;
+      border: none;
+      outline: none;
+    }
+    input::placeholder { color: var(--muted); }
+
+    .btn {
+      padding: 0 2.4rem;
+      font: inherit;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: #fff;
+      background: var(--blue);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+    .btn:hover { background: var(--blue-hover); }
+    .btn:disabled { opacity: 0.6; cursor: wait; }
+    .btn:focus-visible,
+    .icon-btn:focus-visible,
+    .alias-toggle:focus-visible {
+      outline: 2px solid var(--link);
+      outline-offset: 2px;
+    }
+
+    .alias-toggle {
+      margin: 1rem auto 0;
+      padding: 0.25rem 0.5rem;
+      font: inherit;
+      font-size: 0.9rem;
+      color: var(--muted);
+      background: none;
+      border: none;
+      cursor: pointer;
+    }
+    .alias-toggle:hover { color: var(--link); }
+
+    #alias-row { max-width: 860px; margin: 0.9rem auto 0; }
+    #alias-row .input-wrap { padding-left: 1.1rem; }
+    .alias-prefix { color: var(--muted); font-size: 1.05rem; white-space: nowrap; }
+    #alias-input { padding-left: 0; }
+
+    /* ---------- result ---------- */
+    #result {
+      max-width: 500px;
+      margin: 2.25rem auto 0;
+      padding: 1.2rem 1.4rem;
+      text-align: left;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+    }
+    .result-top {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+      color: var(--link);
+    }
+    .result-top svg { flex-shrink: 0; }
+    #result-link {
+      flex: 1;
+      min-width: 0;
+      font-size: 1.2rem;
+      color: var(--link);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #result-link:hover { text-decoration: underline; }
+    #result-original {
+      margin: 0.35rem 0 0 2.15rem;
+      font-size: 0.95rem;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .icon-btn {
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+      width: 36px;
+      height: 36px;
+      color: var(--muted);
+      background: none;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: color .15s, background .15s;
+    }
+    .icon-btn:hover { color: var(--text); background: rgba(255, 255, 255, 0.06); }
+    .icon-btn.copied { color: var(--ok); }
+
+    /* ---------- status line ---------- */
+    #status {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1.1rem;
+      font-size: 0.98rem;
+      min-height: 1.5rem;
+    }
+    #status.ok { color: var(--ok); }
+    #status.err { color: var(--err); }
+
+    /* ---------- recent ---------- */
+    #recent-section { max-width: 500px; margin: 3.5rem auto 0; text-align: left; }
+    #recent-section h2 {
+      margin: 0 0 0.75rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--muted);
+    }
+    #recent { list-style: none; margin: 0; padding: 0; }
+    #recent li {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.7rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .recent-info { flex: 1; min-width: 0; }
+    .recent-info a {
+      display: block;
+      color: var(--link);
+      text-decoration: none;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .recent-info a:hover { text-decoration: underline; }
+    .recent-info small {
+      display: block;
+      color: var(--muted);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .clicks { flex-shrink: 0; font-size: 0.85rem; color: var(--muted); }
+
+    [hidden] { display: none !important; }
+
+    @media (max-width: 600px) {
+      .wrap { padding-top: 4rem; }
+      .form-row { flex-direction: column; }
+      .btn { padding: 1rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="logo" aria-hidden="true">
+      <svg width="68" height="68" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/>
+        <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>
+      </svg>
+    </div>
+
+    <h1>URL <span>Shortener</span></h1>
+    <p class="sub">Paste your link, get a short one.</p>
+
+    <form id="shorten-form" novalidate>
+      <div class="form-row">
+        <div class="input-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/>
+            <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>
+          </svg>
+          <input type="text" id="url-input" placeholder="Enter your long URL here..."
+                 aria-label="Long URL" autocomplete="off" required>
+        </div>
+        <button type="submit" class="btn" id="submit-btn">Shorten</button>
+      </div>
+
+      <button type="button" class="alias-toggle" id="alias-toggle" aria-expanded="false">
+        Use a custom alias
+      </button>
+      <div id="alias-row" hidden>
+        <div class="input-wrap">
+          <span class="alias-prefix" id="alias-prefix"></span>
+          <input type="text" id="alias-input" placeholder="my-link"
+                 aria-label="Custom alias" autocomplete="off">
+        </div>
+      </div>
+    </form>
+
+    <div id="result" hidden>
+      <div class="result-top">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/>
+          <path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/>
+        </svg>
+        <a id="result-link" target="_blank" rel="noopener"></a>
+        <button type="button" class="icon-btn" id="copy-btn" aria-label="Copy short link"></button>
+      </div>
+      <p id="result-original"></p>
+    </div>
+
+    <div id="status" role="status" aria-live="polite"></div>
+
+    <section id="recent-section" hidden>
+      <h2>Recent links</h2>
+      <ul id="recent"></ul>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = "recent-links";
+    const MAX_RECENT = 5;
+
+    const COPY_ICON =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<rect x="9" y="9" width="12" height="12" rx="2"/>' +
+      '<path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+    const CHECK_ICON =
+      '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+      'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<path d="M5 12l5 5L20 7"/></svg>';
+    const OK_ICON =
+      '<svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<circle cx="12" cy="12" r="11" fill="currentColor"/>' +
+      '<path d="M7 12.5l3.2 3.2L17 9" fill="none" stroke="#070d1c" stroke-width="2.4" ' +
+      'stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    const $ = (id) => document.getElementById(id);
+    const form = $("shorten-form");
+    const urlInput = $("url-input");
+    const aliasInput = $("alias-input");
+    const aliasRow = $("alias-row");
+    const aliasToggle = $("alias-toggle");
+    const submitBtn = $("submit-btn");
+    const status = $("status");
+    const result = $("result");
+    const resultLink = $("result-link");
+    const resultOriginal = $("result-original");
+    const copyBtn = $("copy-btn");
+    const recentSection = $("recent-section");
+    const recentList = $("recent");
+
+    $("alias-prefix").textContent = location.host + "/";
+    copyBtn.innerHTML = COPY_ICON; // static markup only, no server data
+
+    // ---------- status line ----------
+    function setStatus(kind, text) {
+      status.className = kind || "";
+      status.textContent = "";
+      if (!text) return;
+      if (kind === "ok") status.insertAdjacentHTML("beforeend", OK_ICON);
+      status.append(document.createTextNode(text));
+    }
+
+    // ---------- storage (can fail in private mode) ----------
+    function loadRecent() {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+      catch (e) { return []; }
+    }
+    function saveRecent(items) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }
+      catch (e) { /* ignore */ }
+    }
+
+    // ---------- copy ----------
+    async function copyText(text, button) {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.innerHTML = CHECK_ICON;
+        button.classList.add("copied");
+      } catch (e) {
+        setStatus("err", "Copy failed. Select the link and press Ctrl+C.");
+        return;
+      }
+      setTimeout(() => {
+        button.innerHTML = COPY_ICON;
+        button.classList.remove("copied");
+      }, 1500);
+    }
+
+    // ---------- recent links ----------
+    function renderRecent() {
+      const items = loadRecent();
+      recentList.textContent = "";
+      recentSection.hidden = items.length === 0;
+
+      for (const item of items) {
+        const li = document.createElement("li");
+
+        const info = document.createElement("div");
+        info.className = "recent-info";
+        const a = document.createElement("a");
+        a.href = item.short_url;
+        a.target = "_blank";
+        a.rel = "noopener";
+        a.textContent = item.short_url.replace(/^https?:\/\//, "");
+        const small = document.createElement("small");
+        small.textContent = item.original_url;
+        info.append(a, small);
+
+        const clicks = document.createElement("span");
+        clicks.className = "clicks";
+        clicks.id = "clicks-" + item.code;
+
+        const copy = document.createElement("button");
+        copy.type = "button";
+        copy.className = "icon-btn";
+        copy.setAttribute("aria-label", "Copy short link");
+        copy.innerHTML = COPY_ICON;
+        copy.addEventListener("click", () => copyText(item.short_url, copy));
+
+        li.append(info, clicks, copy);
+        recentList.appendChild(li);
+        refreshClicks(item.code);
+      }
+    }
+
+    async function refreshClicks(code) {
+      const el = document.getElementById("clicks-" + code);
+      if (!el) return;
+      try {
+        const res = await fetch("/api/stats/" + encodeURIComponent(code));
+        if (res.status === 404) { el.textContent = "expired"; return; }
+        const data = await res.json();
+        el.textContent = data.clicks + (data.clicks === 1 ? " click" : " clicks");
+      } catch (e) {
+        el.textContent = "";
+      }
+    }
+
+    function addRecent(entry) {
+      const items = loadRecent().filter((i) => i.code !== entry.code);
+      items.unshift(entry);
+      saveRecent(items.slice(0, MAX_RECENT));
+      renderRecent();
+    }
+
+    // ---------- alias toggle ----------
+    aliasToggle.addEventListener("click", () => {
+      const open = aliasRow.hidden;
+      aliasRow.hidden = !open;
+      aliasToggle.setAttribute("aria-expanded", String(open));
+      aliasToggle.textContent = open ? "Hide custom alias" : "Use a custom alias";
+      if (open) aliasInput.focus(); else aliasInput.value = "";
+    });
+
+    // ---------- submit ----------
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      result.hidden = true;
+      setStatus("");
+
+      if (!urlInput.value.trim()) {
+        setStatus("err", "Enter a URL to shorten.");
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = "Shortening...";
+
+      try {
+        const res = await fetch("/api/shorten", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            url: urlInput.value,
+            alias: aliasInput.value.trim(),
+          }),
+        });
+
+        let data = {};
+        try { data = await res.json(); } catch (e) { /* non-JSON error page */ }
+
+        if (res.status === 429) {
+          setStatus("err", "Too many requests. Wait a minute and try again.");
+          return;
+        }
+        if (!res.ok) {
+          setStatus("err", data.error || "Something went wrong (status " + res.status + ").");
+          return;
+        }
+
+        resultLink.href = data.short_url;
+        resultLink.textContent = data.short_url;
+        resultOriginal.textContent = data.original_url;
+        copyBtn.innerHTML = COPY_ICON;
+        copyBtn.classList.remove("copied");
+        result.hidden = false;
+        setStatus("ok", "Link shortened!");
+
+        addRecent(data);
+        urlInput.value = "";
+        aliasInput.value = "";
+      } catch (err) {
+        setStatus("err", "Could not reach the server. Check your connection.");
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = "Shorten";
+      }
+    });
+
+    copyBtn.addEventListener("click", () => copyText(resultLink.href, copyBtn));
+
+    renderRecent();
+  </script>
+</body>
+</html>
